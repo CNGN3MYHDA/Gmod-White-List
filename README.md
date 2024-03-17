@@ -9,10 +9,10 @@ This addon will allow you to let players into your server that you designate you
 [Steam Workshop Page](https://steamcommunity.com/sharedfiles/filedetails/?id=3185363412)
 
 # Instructions
-To manage the whitelist, you can use console commands or the in-game panel.<br>
+To manage the whitelist, you can use console commands or the in-game menu.<br>
 
 ### Menu
-The panel has 3 categories:
+The menu has 3 categories:
 1. White List - here you can view whitelisted players, add or remove them.
 2. Config - IN DEV. Here you can change whitelist settings
 3. Logs - IN DEV. Here you can view canceled connections of non-whitelisted players
