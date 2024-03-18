@@ -47,7 +47,7 @@ function BWhiteList.OpenMenu()
 	// Основа
 	frame = vgui.Create("BWL_Frame")
 	frame:SetSize(scrw/1.2, scrh/1.2)
-	frame:SetTitle("White List - v0.6.1 - ALPHA | By Bost")
+	frame:SetTitle("White List - v1.0 | By Bost")
 
 	local toRemove = {}
 
@@ -240,8 +240,9 @@ function BWhiteList.OpenMenu()
 		end
 
 		hook.Add("BWhiteList.ConfigReceive", "MenuUpdate", function(cfg)
-			local oldCfg = table.Copy(cfg)
 			categoryCanvas:Clear()
+			if table.IsEmpty(cfg) then categoryCenterText("Error! Please restart the server") return end
+			local oldCfg = table.Copy(cfg)
 
 			local canvas = categoryCanvas:Add("BWL_Scroll")
 			canvas:SetSize(categoryCanvas:GetWide(), categoryCanvas:GetTall() - 35)
@@ -283,7 +284,7 @@ function BWhiteList.OpenMenu()
 			kickReasonLbl:SetY((kickReason:GetTall()-kickReasonLbl:GetTall())/2)
 
 			local kickReasonEntry = kickReason:Add("BWL_TextEntry")
-			kickReasonEntry:SetValue(cfg.reason)
+			kickReasonEntry:SetValue(cfg.reason or "")
 			kickReasonEntry:SetSize(kickReason:GetWide()-kickReasonLbl:GetWide()-5, kickReason:GetTall())
 			kickReasonEntry:SetPos(kickReasonLbl:GetWide() + 5, 0)
 			function kickReasonEntry:OnChange()
