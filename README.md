@@ -1,7 +1,5 @@
 [Русский](README-RU.md)
 
-> [!NOTE]
-> Addon in ALPHA version
 
 # Information
 Addon that adds a whitelist for the game Garry's Mod.<br>
