@@ -15,10 +15,10 @@ local function requireConfig()
 	net.SendToServer()
 end
 
-local function setConfigVal(key, val)
+local function setConfig(cfg)
 	net.Start("BWhiteList.Config")
 		net.WriteBool(false)
-		net.WriteString(util.TableToJSON({[key]=val}))
+		net.WriteString(util.TableToJSON(cfg))
 	net.SendToServer()
 end
 
@@ -36,29 +36,20 @@ end
 
 local function requireLogsCount()
 	net.Start("BWhiteList.Logs")
-		net.WriteBool(false)
+		net.WriteBool(true)
 	net.SendToServer()
 end
 
 function BWhiteList.OpenMenu()
 	local scrw, scrh = ScrW(), ScrH()
-	if IsValid(frame) then frame:Remove() end
+	if IsValid(frame) then frame:Remove() timer.Simple(0.1, BWhiteList.OpenMenu) return end
 
 	// Основа
 	frame = vgui.Create("BWL_Frame")
 	frame:SetSize(scrw/1.2, scrh/1.2)
-	frame:SetTitle("White List - v0.1 - ALPHA | By Bost")
+	frame:SetTitle("White List - v0.6.1 - ALPHA | By Bost")
 
 	local toRemove = {}
-	function frame:OnRemove()
-		hook.Remove("BWhiteList.ConfigReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.WhitelistReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.LogsCountReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.LogsReceive", "MenuUpdate")
-		for _, v in pairs(toRemove) do
-			if IsValid(v) then v:Remove() end
-		end
-	end
 
 	// Панель категории
 	local categoryCanvas = frame:GetCanvas()
@@ -85,6 +76,16 @@ function BWhiteList.OpenMenu()
 
 		self:SetWide(self:ChildCount()*(btnW+2)-2)
 		self:SetX((frame:GetWide()-self:GetWide())/2)
+	end
+
+	function frame:OnRemove()
+		for _, btn in pairs(categoriesBtns:GetChildren()) do
+			btn:DestroyCategoty()
+		end
+
+		for _, v in pairs(toRemove) do
+			if IsValid(v) then v:Remove() end
+		end
 	end
 
 	local updateButton = frame:Add("BWL_Button")
@@ -139,8 +140,8 @@ function BWhiteList.OpenMenu()
 			timer.Simple(3, BWhiteList.CloseMenu)
 			return
 		else
-			requireList()
 			categoryCenterText("Please wait...")
+			requireList()
 		end
 
 		hook.Add("BWhiteList.WhitelistReceive", "MenuUpdate", function(lst)
@@ -151,12 +152,11 @@ function BWhiteList.OpenMenu()
 			addBtn:SetSize(categoryCanvas:GetWide(), 30)
 			addBtn:SetPos(0, categoryCanvas:GetTall()-addBtn:GetTall())
 			function addBtn:DoClick()
-				self:SetEnabled(false)
-				BWhiteList.Quest("Enter SteamID", BWhiteList.IsSteamID, "Invalid SteamID!", function(sid)
+				frame:SetMouseInputEnabled(false)
+				BWhiteList.Quest("Enter SteamID", function(sID) return BWhiteList.IsSteamID(string.Trim(sID)) end, "Invalid SteamID!", function(sid)
 					RunConsoleCommand("whitelist", "add", string.Trim(sid))
-					updateButton:DoClick()
-					if IsValid(self) then self:SetEnabled(true) end
-				end, function() if IsValid(self) then self:SetEnabled(true) end end)
+					if IsValid(frame) then frame:SetMouseInputEnabled(true) end
+				end, function() if IsValid(frame) then frame:SetMouseInputEnabled(true) end end)
 			end
 
 			local tbl = categoryCanvas:Add("BWL_Table")
@@ -171,9 +171,9 @@ function BWhiteList.OpenMenu()
 				local ply = player.GetBySteamID(sID)
 				local name = IsValid(ply) and ply:Nick() or "Player offline"
 
-				local lbl = vgui.Create( "BWL_Label", self )
+				local lbl = vgui.Create("BWL_Label")
 				lbl:SetText(name)
-				lbl.Value = name
+				lbl:SetContentAlignment(5)
 				lbl:SetTextColor(IsValid(ply) and Color(20, 255, 20) or Color(255, 20, 20))
 
 				local controls = vgui.Create("DPanel")
@@ -206,8 +206,8 @@ function BWhiteList.OpenMenu()
 					CopySIDBtn:SetSize(controls:GetWide()/2, controls:GetTall()/2)
 					CopySIDBtn:SetPos(controls:GetWide()/2+1, controls:GetTall()/2)
 
-					RemoveBtn:SetSize(controls:GetWide(), controls:GetTall()/2)
-					RemoveBtn:SetPos(0, 0)
+					RemoveBtn:SetSize(controls:GetWide()-1, controls:GetTall()/2)
+					RemoveBtn:SetPos(1, 0)
 				end
 
 				local line = tbl:AddLine(lbl, sID, controls)
@@ -226,9 +226,7 @@ function BWhiteList.OpenMenu()
 			end)
 		end)
 	end, function()
-		hook.Remove("BWhiteList.ConfigReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.LogsCountReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.LogsReceive", "MenuUpdate")
+		hook.Remove("BWhiteList.ConfigReceive", "WhitelistReceive")
 	end)
 
 	addCategotyBtn("Config", function()
@@ -237,17 +235,105 @@ function BWhiteList.OpenMenu()
 			timer.Simple(3, BWhiteList.CloseMenu)
 			return
 		else
-			categoryCenterText("Not implemented")
-			return
+			categoryCenterText("Please wait...")
+			requireConfig()
 		end
 
-		hook.Add("BWhiteList.ConfigReceive", "MenuUpdate", function()
+		hook.Add("BWhiteList.ConfigReceive", "MenuUpdate", function(cfg)
+			local oldCfg = table.Copy(cfg)
 			categoryCanvas:Clear()
+
+			local canvas = categoryCanvas:Add("BWL_Scroll")
+			canvas:SetSize(categoryCanvas:GetWide(), categoryCanvas:GetTall() - 35)
+
+			local saveBtn = categoryCanvas:Add("BWL_Button")
+			saveBtn:SetText("Save")
+			saveBtn:SetEnabled(false)
+			saveBtn:SetSize(categoryCanvas:GetWide(), 30)
+			saveBtn:SetPos(0, categoryCanvas:GetTall()-30)
+			function saveBtn:DoClick()
+				setConfig(cfg)
+				updateButton:DoClick()
+			end
+
+			local function detectChanges()
+				for k, v in pairs(cfg) do
+					if oldCfg[k] != v then saveBtn:SetEnabled(true) return end
+				end
+				saveBtn:SetEnabled(false)
+			end
+
+			// General
+			local generalCategory = canvas:Add("BWL_CollapsibleCategory")
+			generalCategory:SetSize(canvas:GetWide(), 30)
+			generalCategory:SetText("General")
+
+			local enableBtn = generalCategory:AddItem("BWL_CheckBox")
+			enableBtn:SetText("Enable")
+			enableBtn:SetChecked(cfg.enable)
+			function enableBtn:OnChanged()
+				cfg.enable = self:GetChecked()
+				detectChanges()
+			end
+
+			local kickReason = generalCategory:AddItem("EditablePanel")
+			generalCategory:InvalidateLayout(true)
+			local kickReasonLbl = kickReason:Add("BWL_Label")
+			kickReasonLbl:SetText("Kick reason: ")
+			kickReasonLbl:SetY((kickReason:GetTall()-kickReasonLbl:GetTall())/2)
+
+			local kickReasonEntry = kickReason:Add("BWL_TextEntry")
+			kickReasonEntry:SetValue(cfg.reason)
+			kickReasonEntry:SetSize(kickReason:GetWide()-kickReasonLbl:GetWide()-5, kickReason:GetTall())
+			kickReasonEntry:SetPos(kickReasonLbl:GetWide() + 5, 0)
+			function kickReasonEntry:OnChange()
+				cfg.reason = self:GetValue()
+				detectChanges()
+			end
+
+			local forceKickBtn = generalCategory:AddItem("BWL_CheckBox")
+			forceKickBtn:SetText("Kick a player after being removed from the whitelist")
+			forceKickBtn:SetChecked(cfg.forceKick)
+			function forceKickBtn:OnChanged()
+				cfg.forceKick = self:GetChecked()
+				detectChanges()
+			end
+
+			// Logs
+			local logsCategory = canvas:Add("BWL_CollapsibleCategory")
+			logsCategory:SetSize(canvas:GetWide(), 30)
+			logsCategory:SetText("Logs")
+
+			function logsCategory:Think()
+				self:SetPos(0, generalCategory:GetTall()+5)
+			end
+
+			local writeConnectedBtn = logsCategory:AddItem("BWL_CheckBox")
+			writeConnectedBtn:SetText("Log connections of whitelisted players")
+			writeConnectedBtn:SetChecked(cfg.writeConnectedLogs)
+			function writeConnectedBtn:OnChanged()
+				cfg.writeConnectedLogs = self:GetChecked()
+				detectChanges()
+			end
+
+			local writeNotConnectedBtn = logsCategory:AddItem("BWL_CheckBox")
+			writeNotConnectedBtn:SetText("Log canceled connections of players not whitelisted")
+			writeNotConnectedBtn:SetChecked(cfg.writeNotConnectedLogs)
+			function writeNotConnectedBtn:OnChanged()
+				cfg.writeNotConnectedLogs = self:GetChecked()
+				detectChanges()
+			end
+
+			local oneLogOnSessionBtn = logsCategory:AddItem("BWL_CheckBox")
+			oneLogOnSessionBtn:SetText("Delete the log after each server start")
+			oneLogOnSessionBtn:SetChecked(cfg.oneLogOnSession)
+			function oneLogOnSessionBtn:OnChanged()
+				cfg.oneLogOnSession = self:GetChecked()
+				detectChanges()
+			end
 		end)
 	end, function()
-		hook.Remove("BWhiteList.WhitelistReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.LogsCountReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.LogsReceive", "MenuUpdate")
+		hook.Remove("BWhiteList.ConfigReceive", "MenuUpdate")
 	end)
 
 	addCategotyBtn("Logs", function()
@@ -256,16 +342,178 @@ function BWhiteList.OpenMenu()
 			timer.Simple(3, BWhiteList.CloseMenu)
 			return
 		else
-			categoryCenterText("Not implemented")
-			return
+			categoryCenterText("Please wait...")
+			requireLogsCount()
 		end
 
-		hook.Add("BWhiteList.LogsReceive", "MenuUpdate", function()
-			categoryCanvas:Clear()
+		hook.Add("BWhiteList.LogsCountReceive", "MenuUpdate", function(pagesCount)
+			if pagesCount < 1 then categoryCanvas:Clear() categoryCenterText("No logs") return end
+
+			requireLogsPage(1)
+			local page = 1
+
+			hook.Add("BWhiteList.LogsReceive", "MenuUpdate", function(logs)
+				categoryCanvas:Clear()
+
+				local nextPageBtn = categoryCanvas:Add("BWL_Button")
+				nextPageBtn:SetText(">")
+				nextPageBtn:SetSize(30, 30)
+				nextPageBtn:SetPos(categoryCanvas:GetWide()-30, categoryCanvas:GetTall()-30)
+				function nextPageBtn:DoClick()
+					local nextPage = page + 1
+					if nextPage > pagesCount then return end
+					requireLogsPage(nextPage)
+					page = page + 1
+				end
+
+				local pageLbl = categoryCanvas:Add("BWL_Label")
+				pageLbl:SetText(tostring(page).."/"..pagesCount)
+				pageLbl:SetSize(math.max(pageLbl:GetWide()+10, nextPageBtn:GetWide()), nextPageBtn:GetTall())
+				pageLbl:SetContentAlignment(5)
+				pageLbl:SetPos(nextPageBtn:GetX()-pageLbl:GetWide()-2, categoryCanvas:GetTall()-15-pageLbl:GetTall()/2)
+				function pageLbl:Paint(w, h)
+					// Рамка
+					surface.SetDrawColor(50, 50, 50)
+					surface.DrawOutlinedRect(0, 0, w, h, 1)
+
+					// Основное окно
+					surface.SetDrawColor(clr or Color(35, 35, 35))
+					surface.DrawRect(1, 1, w-2, h-2)
+				end
+
+				local prevPageBtn = categoryCanvas:Add("BWL_Button")
+				prevPageBtn:SetText("<")
+				prevPageBtn:SetSize(30, 30)
+				prevPageBtn:SetPos(pageLbl:GetX()-prevPageBtn:GetWide()-2, categoryCanvas:GetTall()-30)
+				function prevPageBtn:DoClick()
+					local prevPage = page - 1
+					if prevPage < 1 then return end
+					requireLogsPage(prevPage)
+					page = page - 1
+				end
+
+				-- local searchEntry = categoryCanvas:Add("BWL_TextEntry")
+				-- searchEntry:SetSize(prevPageBtn:GetX() - 5, 30)
+				-- searchEntry:SetPos(0, categoryCanvas:GetTall()-searchEntry:GetTall())
+
+				-- local searchBtn = categoryCanvas:Add("BWL_Button")
+				-- searchBtn:SetText("<")
+				-- searchBtn:SetSize(30, 30)
+				-- searchBtn:SetPos(0, categoryCanvas:GetTall()-30)
+				-- function searchBtn:DoClick()
+					
+				-- end
+
+				local tbl = categoryCanvas:Add("BWL_Table")
+				tbl:SetSize(categoryCanvas:GetWide(), categoryCanvas:GetTall()-nextPageBtn:GetTall()-5)
+				tbl:AddColumn("Time")
+				tbl:AddColumn("Log")
+
+				local max = 0
+				local infoOpened = false
+
+				for _, log in pairs(logs) do
+					local curTime = os.date("*t")
+					local time = tonumber(log.time)
+					if time then
+						time = os.date("*t", time)
+						if time.year < curTime.year then
+							local diff = curTime.year-time.year
+							if diff == 1 then
+								time = "Last year"
+							else
+								time = diff.." years"
+							end
+						elseif time.month < curTime.month then
+							local diff = curTime.month-time.month
+							if diff == 1 then
+								time = "Last month"
+							else
+								time = diff.." months"
+							end
+						elseif time.yday < curTime.yday then
+							local diff = curTime.yday-time.yday
+							if diff == 1 then
+								time = "Yesterday"
+							else
+								time = diff.." days"
+							end
+						else
+							time.hour = (time.hour < 10) and "0"..time.hour or time.hour
+							time.min = (time.min < 10) and "0"..time.min or time.min
+							time = time.hour..":"..time.min
+						end
+					else
+						time = "???"
+					end
+
+					local name = log.name
+					local steamID = log.SteamID
+					local address = log.address
+					local fStr = log.str
+
+					local line = tbl:AddLine(time, string.format(fStr, name, steamID))
+					local column2 = line.Columns[2].pnl
+					column2:SetMouseInputEnabled(true)
+					column2:SetKeyboardInputEnabled(true)
+					column2:SetCursor("hand")
+					column2.DoClick = function()
+						if infoOpened then return end
+						infoOpened = true
+						frame:SetMouseInputEnabled(false)
+						local logMsg = vgui.Create("BWL_Frame")
+						logMsg:SetSize(scrw/2, scrh/3)
+						logMsg:Center()
+						logMsg:InvalidateLayout(true)
+						function logMsg:OnRemove()
+							infoOpened = false
+							frame:SetMouseInputEnabled(true)
+						end
+						local canvas = logMsg:GetCanvas()
+
+						local msgScroll = canvas:Add("BWL_Scroll")
+						msgScroll:SetSize(canvas:GetSize())
+
+						local vals = {}
+						local function addVal(name, val)
+							val = tostring(val)
+
+							local pnl = msgScroll:Add("DPanel")
+							pnl:SetPaintBackground(false)
+							pnl:SetSize(msgScroll:GetWide(), 30)
+							pnl:SetPos(0, table.Count(vals)*(30+2))
+
+							local lbl = pnl:Add("BWL_Label")
+							lbl:SetText(name..": "..val)
+							lbl:SetPos(5, 15-lbl:GetTall()/2)
+
+							local copyBtn = pnl:Add("BWL_Button")
+							copyBtn:SetText("Copy")
+							copyBtn:SetSize(60, 25)
+							copyBtn:SetPos(lbl:GetX()+lbl:GetWide()+10, 2.5)
+							function copyBtn:DoClick()
+								SetClipboardText(val)
+							end
+							table.insert(vals, pnl)
+						end
+
+						addVal("Name", name)
+						addVal("SteamID", steamID)
+						addVal("Address", address)
+						addVal("Time", tostring(log.time) and os.date("%H:%M:%S - %d.%m.%Y", tostring(log.time)) or "???")
+					end
+
+					local pnl = line.Columns[1].pnl
+					local lblW = pnl.GetTextSize and pnl:GetTextSize() or pnl:GetWide()
+					max = (max < lblW) and lblW or max
+				end
+
+				tbl:SetColumnWidth(1, max+20)
+			end)
 		end)
 	end, function()
-		hook.Remove("BWhiteList.WhitelistReceive", "MenuUpdate")
-		hook.Remove("BWhiteList.ConfigReceive", "MenuUpdate")
+		hook.Remove("BWhiteList.LogsReceive", "MenuUpdate")
+		hook.Remove("BWhiteList.LogsCountReceive", "MenuUpdate")
 	end)
 
 	local firstCategoty = categoriesBtns:GetChildren()[1]
@@ -290,24 +538,15 @@ function BWhiteList.Quest(text, check, failMsg, successCallBack, cancelCallBack)
 	frame:SetSize(scrw/2, scrh/4)
 	frame:SetTitle("White List - Question")
 	frame:InvalidateLayout(true)
+	function frame:OnRemove()
+		if cancelCallBack then cancelCallBack() end
+	end
 
 	local canvas = frame:GetCanvas()
 
-	local entry = canvas:Add("DTextEntry")
+	local entry = canvas:Add("BWL_TextEntry")
 	entry:SetSize(500, 30)
 	entry:SetPos((canvas:GetWide()-entry:GetWide())/2, (canvas:GetTall()-entry:GetTall())/2)
-	entry:SetFont("BWhiteList.Label")
-	function entry:Paint(w, h)
-		// Рамка
-		surface.SetDrawColor(50, 50, 50)
-		surface.DrawOutlinedRect(0, 0, w, h, 1)
-
-		// Основное окно
-		surface.SetDrawColor(Color(255, 255, 255))
-		surface.DrawRect(1, 1, w-2, h-2)
-
-		self:DrawTextEntryText(Color(0, 0, 0), Color(80, 80, 200), Color(0, 0, 0))
-	end
 
 	local lbl = canvas:Add("BWL_Label")
 	lbl:SetText(text)

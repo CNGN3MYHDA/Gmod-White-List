@@ -5,15 +5,16 @@ local LIST_PATH = "whitelist/whitelist.json"
 local CONFIG_PATH = "whitelist/config.json"
 local LOGS_PATH = "whitelist/logs.txt"
 local LOGS_PAGE = 20
-file.Delete(LOGS_PATH)
 
 local defaultConfig = {
-	VERSION = 1,							-- версия конфига (НЕ ТРОГАТЬ)
+	VERSION = 3,							-- версия конфига (НЕ ТРОГАТЬ)
 	enable = true,  						-- Включен/выключен
 	reason = "You are not in white list!",  -- Причина kick'а
 	forceKick = false,						-- Kick'ать игроков, если они были удалены из white list'а, пока находились на сервере
 	forceKickReason = nil, 					-- Причина kick'а игрока, если он был удалён из white list'а, пока находился на сервере (nil == стандартная причина)
-	writeConnectedLogs = true 				-- Записывать логи подключившихся игроков, которые в white list'е
+	writeConnectedLogs = true, 				-- Записывать логи подключившихся игроков, которые в white list'е,
+	writeNotConnectedLogs = true, 			-- записывать логи отменённых подключений игроков, которые не в white list'е,
+	oneLogOnSession = true					-- удалять старый лог при старте сервера
 }
 
 local configAliases = {}
@@ -30,9 +31,11 @@ local function log(passed, name, steamID, address)
 	local logStr
 	if passed and BWhiteList.GetConfigValue("writeConnectedLogs") then
 		logStr = "Player %s (%s) connected. Player is whitelisted!"
-	else
+	end
+	if !passed and BWhiteList.GetConfigValue("writeNotConnectedLogs") then
 		logStr = "Connection of player %s (%s) was cancelled. Player is not whitelisted!"
 	end
+	if !logStr then return end
 	local args = {
 		Color(150, 150, 200),
 		"[White List] ",
@@ -41,7 +44,9 @@ local function log(passed, name, steamID, address)
 	}
 	MsgC(unpack(args))
 
-	file.Append(LOGS_PATH, string.format("time=%s;passed=%s;str=%s;name=%s;SteamID=%s;address=%s\n", os.time(), passed and 1 or 0, logStr, name, steamID, address))
+	local logs = file.Read(LOGS_PATH, "DATA") or ""
+	logs = string.format("time=%s;passed=%s;str=%s;name=%s;SteamID=%s;address=%s\n", os.time(), passed and 1 or 0, logStr, name, steamID, address) .. logs
+	file.Write(LOGS_PATH, logs)
 end
 
 if !file.Exists(CONFIG_PATH, "DATA") then
@@ -53,7 +58,7 @@ function BWhiteList.Add(steamID)
 	assert(isstring(steamID), "steamID must be a string!")
 
 	local lst = get(LIST_PATH)
-	lst[steamID] = true
+	lst[steamID:upper()] = true
 	set(LIST_PATH, lst)
 end
 
@@ -62,7 +67,7 @@ function BWhiteList.Remove(steamID)
 	assert(isstring(steamID), "steamID must be a string!")
 
 	local lst = get(LIST_PATH)
-	lst[steamID] = nil
+	lst[steamID:upper()] = nil
 	set(LIST_PATH, lst)
 
 	local target = player.GetBySteamID(steamID)
@@ -79,12 +84,12 @@ end
 // Получить логи
 function BWhiteList.GetLogs()
 	local logs = {}
-	local logsStr = file.Read(LOGS_PATH, "DATA")
+	local logsStr = file.Read(LOGS_PATH, "DATA") or ""
 
 	for k, log in pairs(string.Split(logsStr, "\n")) do
 		local tbl = {}
 		for _, p in pairs(string.Split(log, ";")) do
-			for k, v in string.gmatch(p, "([%w_]+)%s*=%s*([%w_]+)") do
+			for k, v in string.gmatch(p, "([%w_]+)%s*=%s*(.+)") do
 				tbl[k] = v
 			end
 		end
@@ -96,13 +101,21 @@ end
 
 // Получить кол-во страниц логов
 function BWhiteList.GetLogsPagesCount()
-	return table.Count(BWhiteList.GetLogs()) / LOGS_PAGE
+	return math.ceil(table.Count(BWhiteList.GetLogs()) / LOGS_PAGE)
 end
 
 // Получить страницу логов
-function BWhiteList.GetLogsPage(page)
-	assert(isnumber(page), "page must be a number!")
-	return BWhiteList.GetLogs()[page] or {}
+function BWhiteList.GetLogsPage(pageNum)
+	assert(isnumber(pageNum), "pageNum must be a number!")
+
+	local page = {}
+	local logs = BWhiteList.GetLogs()
+
+	for i=(pageNum-1)*LOGS_PAGE+1, math.min(pageNum*LOGS_PAGE, table.Count(logs)) do
+		table.insert(page, logs[i])
+	end
+
+	return page
 end
 
 // Получить весь конфиг
@@ -119,10 +132,9 @@ end
 
 // Установить значение конфига
 function BWhiteList.SetConfigValue(key, val)
-	assert(isstring(key), "key must be a string!")
-
 	local lst = get(CONFIG_PATH)
-	lst[val] = val
+	lst[key] = val
+	set(CONFIG_PATH, lst)
 end
 
 // Запрет входа, если не в white list'е
@@ -130,24 +142,37 @@ gameevent.Listen("player_connect")
 hook.Add("player_connect", "BWhiteList.Check", function(data)
 	if !BWhiteList.GetConfigValue("enable") or data.bot == 1 then return end
 
+	local passed = true
+
 	if !BWhiteList.GetList()[data.networkid] then
 		game.KickID(data.userid, BWhiteList.GetConfigValue("reason"))
-		log()
+		passed = false
 	end
+
+	log(passed, data.name, data.networkid, data.address)
 end)
 
+// Обновлнение конфига
 local version = BWhiteList.GetConfigValue("VERSION")
-if !version then set(CONFIG_PATH, defaultConfig) return end
-if version < defaultConfig.VERSION then
-	local cfg = table.Copy(defaultConfig)
-	for k, v in pairs(get(CONFIG_PATH)) do
-		for curKey, aliases in pairs(configAliases) do
-			if aliases[k] then
-				cfg[curKey] = v
-				break
+if version then
+	if version < defaultConfig.VERSION then
+		local cfg = table.Copy(defaultConfig)
+		for k, v in pairs(get(CONFIG_PATH)) do
+			if k == "VERSION" then continue end
+			for curKey, aliases in pairs(configAliases) do
+				if aliases[k] then
+					cfg[curKey] = v
+					break
+				end
 			end
+			cfg[k] = v
 		end
-		cfg[k] = v
+		set(CONFIG_PATH, cfg)
 	end
-	set(CONFIG_PATH, cfg)
+else
+	set(CONFIG_PATH, defaultConfig)
+end
+
+if BWhiteList.GetConfigValue("oneLogOnSession") then
+	file.Delete(LOGS_PATH)
 end

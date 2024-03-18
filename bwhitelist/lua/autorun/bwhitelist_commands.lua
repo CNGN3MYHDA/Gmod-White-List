@@ -4,6 +4,7 @@ local API_KEY = "A7B330BA9E2866723EF8888E6AE7092D"  -- Сделай вид, чт
 // Проверить: является ли аргумент SteamID
 function BWhiteList.IsSteamID(str)
 	if !isstring(str) then return false end
+	str = str:upper()
 	if str:match("^STEAM_%d:%d:%d%d%d%d%d%d%d%d%d$") then
 		return true
 	else
@@ -196,6 +197,8 @@ local methods = {
 concommand.Add("whitelist", function(ply, cmd, args, strargs)
 	args = SplitByArgs(strargs)
 	local method = args[1]
+	if !method then callBackMsg(ply, Color(255, 20, 20), "Method required!") return end
+
 	method = methods[method]
 
 	if !method then callBackMsg(ply, Color(255, 20, 20), "Method '"..args[1].."' not allowed!") return end
@@ -209,7 +212,7 @@ function(cmd, strargs)
 	local method = args[1] or ""
 	method = methods[method]
 
-	if args[2] and method and method.canUse and method.canUse(ply) != false and method.autoComplete then
+	if method and method.canUse and method.canUse(ply) != false and method.autoComplete then
 		cmd = cmd.." \""..table.remove(args, 1).."\""
 		return method.autoComplete(cmd, args)
 	end

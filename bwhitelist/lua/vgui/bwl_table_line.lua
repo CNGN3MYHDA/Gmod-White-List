@@ -1,7 +1,11 @@
 local PANEL = {}
 
+AccessorFunc(PANEL, "autoColumnWidth", "AutoColumnWidth", FORCE_BOOL)
+
 function PANEL:Init()
+	self:SetPaintBackground(false)
 	self.Columns = {}
+	self:SetAutoColumnWidth(true)
 end
 
 function PANEL:Paint(w, h)
@@ -11,54 +15,80 @@ function PANEL:Paint(w, h)
 
 	// Основное окно
 	surface.SetDrawColor(clr or Color(35, 35, 35))
-	surface.DrawRect(1, 1, w-2, h-2)  -- 3 вмсето 2 для объёма
+	surface.DrawRect(1, 1, w-2, h-2)
 
-	local part = w / table.Count(self.Columns)
+	local x = 0
 
 	for i=1, table.Count(self.Columns)-1 do
-		draw.RoundedBox(0, i*part, 0, 1, h, Color(50, 50, 50))
+		local part
+		if self:GetAutoColumnWidth() then
+			part = w / table.Count(self.Columns)
+		else
+			part = self.Columns[i].width
+		end
+		draw.RoundedBox(0, x+part, 0, 1, h, Color(50, 50, 50))
+		x = x + part
 	end
 end
 
-function PANEL:SetColumnText(k, text)
+function PANEL:SetColumnText(k, text, width)
+	width = width or -1
 	if ispanel(text) then
-		self.Columns[k] = text
+		self.Columns[k] = {width=width, pnl=text}
 		text:SetParent(self)
-		self:InvalidateLayout()
+		text.Value = text.Value or ""
+		self:InvalidateLayout(true)
+
+		return text
 	else
-		local pnl
-		if !IsValid(self.Columns[k]) then
-			self.Columns[k] = vgui.Create( "BWL_Label", self )
-			self.Columns[k]:SetMouseInputEnabled(false)
+		if !self.Columns[k] or !IsValid(self.Columns[k].pnl) then
+			self.Columns[k] = {width=width, pnl=vgui.Create("BWL_Label", self)}
 		end
-		pnl = self.Columns[k]
+		pnl = self.Columns[k].pnl
 		pnl:SetText(tostring(text))
 		pnl.Value = text
+		self:InvalidateLayout(true)
 
 		return pnl
 	end
 end
 
 function PANEL:GetColumnText(k)
-	return self.Columns[k] and self.Columns[k].Value
+	return self.Columns[k].pnl and self.Columns[k].pnl.Value
+end
+
+function PANEL:SetColumnWidth(k, width)
+	self.Columns[k].width = width
+end
+
+function PANEL:GetColumnWidth(k)
+	return self.Columns[k].width
+end
+
+function PANEL:GetColumnValue(k)
+	return self.Columns[k].pnl.Value
 end
 
 function PANEL:PerformLayout(w, h)
-	local part = w / table.Count(self.Columns)
-
+	local x = 0
 	for k, v in pairs(self.Columns) do
-		if !IsValid(v) then continue end
-		
-		if v.Value then
-			local lblW, lblH = v:GetTextSize()
-			local textW = (lblW+10 > part) and part-10 or lblW
-			v:SetSize(textW, lblH)
-			v:SetPos((k*part)-(part+textW)/2, (h-lblH)/2)
+		if !IsValid(v.pnl) then continue end
+
+		local part
+
+		if k == table.Count(self.Columns) then
+			part = w - x
+		elseif self:GetAutoColumnWidth() then
+			part = w / table.Count(self.Columns)
 		else
-			k = (k == table.Count(self.Columns)) and k-1 or k
-			v:SetSize(part, h-2)
-			v:SetPos(k*part, 1)
+			part = v.width
 		end
+		
+		v.pnl:SetSize(part, h-2)
+		v.pnl:SetPos(x, 1)
+		v.pnl:SetContentAlignment(5)
+
+		x = x + part
 	end
 end
 

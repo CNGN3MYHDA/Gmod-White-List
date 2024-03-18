@@ -7,16 +7,7 @@ function PANEL:Init()
 	self:SetPaintBackground(false)
 
 	self.Header = self:Add("BWL_TableLine")
-
-	self.CanVas = self:Add("DScrollPanel")
-	local canVas = self.CanVas
-
-	canVas.VBar:SetHideButtons(true)
-	canVas.VBar:SetWide(5)
-	canVas.VBar.Paint = nil
-	canVas.VBar.btnGrip.Paint = function(self, w, h)
-		draw.RoundedBox(20, 0, -w, w, h+w*2, Color(50, 50, 50))
-	end
+	self.CanVas = self:Add("BWL_Scroll")
 
 	self:InvalidateLayout()
 end
@@ -31,6 +22,15 @@ function PANEL:AddColumn(name, pos)
 	self:Rebuild()
 end
 
+function PANEL:SetColumnWidth(k, width)
+	self.Header:SetAutoColumnWidth(false)
+	self.Header:SetColumnWidth(k, width)
+	for _, line in pairs(self.Lines) do
+		line:SetAutoColumnWidth(false)
+		line:SetColumnWidth(k, width)
+	end
+end
+
 function PANEL:AddLine(...)
 	local args = {...}
 
@@ -41,6 +41,8 @@ function PANEL:AddLine(...)
 	for k, v in pairs(self.Columns) do
 		line:SetColumnText(k, args[k])
 	end
+
+	line:InvalidateLayout(true)
 
 	table.insert(self.Lines, line)
 
@@ -78,8 +80,8 @@ function PANEL:Rebuild()
 	for k, v in pairs(self.Lines) do
 		if !IsValid(v) then continue end
 		local data = {}
-		for _, v in pairs(v.Columns) do
-			table.insert(data, v.Value)
+		for i=1, #v.Columns do
+			table.insert(data, v:GetColumnValue(i))
 		end
 		v:Remove()
 		table.insert(lines, data)
@@ -88,6 +90,9 @@ function PANEL:Rebuild()
 	table.Empty(self.Lines)
 	
 	for _, v in pairs(lines) do
+		while #v < #self.Columns do
+			table.insert(v, "")
+		end
 		self:AddLine(unpack(v))
 	end
 end
