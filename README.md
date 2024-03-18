@@ -12,8 +12,8 @@ To manage the whitelist, you can use console commands or the in-game menu.<br>
 ### Menu
 The menu has 3 categories:
 1. White List - here you can view whitelisted players, add or remove them.
-2. Config - IN DEV. Here you can change whitelist settings
-3. Logs - IN DEV. Here you can view canceled connections of non-whitelisted players
+2. Config - Here you can change whitelist settings
+3. Logs - Here you can view canceled connections of non-whitelisted players
 
 ### Console Commands
 1. `whitelist add SteamID` - adds a player to the whitelist by SteamID
