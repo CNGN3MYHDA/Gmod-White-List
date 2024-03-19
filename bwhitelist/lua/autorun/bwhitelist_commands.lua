@@ -154,6 +154,7 @@ local methods = {
 	},
 	remove = {
 		autoComplete = function(cmd, args)
+			if CLIENT then return end
 			local steamID = args[1] or ""
 			steamID = steamID:lower()
 
@@ -185,6 +186,7 @@ local methods = {
 	},
 	openmenu = {
 		callback = function(ply, args)
+			if CLIENT then return end
 			net.Start("BWhiteList.OpenMenu")
 			net.Send(ply)
 		end,
