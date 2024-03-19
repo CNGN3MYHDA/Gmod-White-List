@@ -47,7 +47,8 @@ function BWhiteList.OpenMenu()
 	// Основа
 	frame = vgui.Create("BWL_Frame")
 	frame:SetSize(scrw/1.2, scrh/1.2)
-	frame:SetTitle("White List - v1.0 | By Bost")
+	frame:SetTitle("White List - v1.2.1 | By Bost")
+	frame:InvalidateLayout(true)
 
 	local toRemove = {}
 
@@ -140,7 +141,7 @@ function BWhiteList.OpenMenu()
 			timer.Simple(3, BWhiteList.CloseMenu)
 			return
 		else
-			categoryCenterText("Please wait...")
+			categoryCenterText("Receiving...")
 			requireList()
 		end
 
@@ -154,8 +155,16 @@ function BWhiteList.OpenMenu()
 			function addBtn:DoClick()
 				frame:SetMouseInputEnabled(false)
 				BWhiteList.Quest("Enter SteamID", function(sID) return BWhiteList.IsSteamID(string.Trim(sID)) end, "Invalid SteamID!", function(sid)
-					RunConsoleCommand("whitelist", "add", string.Trim(sid))
 					if IsValid(frame) then frame:SetMouseInputEnabled(true) end
+					categoryCanvas:Clear()
+					categoryCenterText("Executing...")
+					hook.Add("BWhiteList.Callback", "MenuUpdate", function()
+						hook.Remove("BWhiteList.Callback", "MenuUpdate")
+						if IsValid(frame) then
+							updateButton:DoClick()
+						end
+					end)
+					RunConsoleCommand("whitelist", "add", string.Trim(sid))
 				end, function() if IsValid(frame) then frame:SetMouseInputEnabled(true) end end)
 			end
 
@@ -195,8 +204,15 @@ function BWhiteList.OpenMenu()
 				local RemoveBtn = controls:Add("BWL_Button")
 				RemoveBtn:SetText("Remove")
 				function RemoveBtn:DoClick()
+					categoryCanvas:Clear()
+					categoryCenterText("Executing...")
+					hook.Add("BWhiteList.Callback", "MenuUpdate", function()
+						hook.Remove("BWhiteList.Callback", "MenuUpdate")
+						if IsValid(frame) then
+							updateButton:DoClick()
+						end
+					end)
 					RunConsoleCommand("whitelist", "remove", sID)
-					updateButton:DoClick()
 				end
 
 				function controls:PerformLayout(w, h)
@@ -227,6 +243,7 @@ function BWhiteList.OpenMenu()
 		end)
 	end, function()
 		hook.Remove("BWhiteList.ConfigReceive", "WhitelistReceive")
+		hook.Remove("BWhiteList.Callback", "MenuUpdate")
 	end)
 
 	addCategotyBtn("Config", function()
@@ -235,7 +252,7 @@ function BWhiteList.OpenMenu()
 			timer.Simple(3, BWhiteList.CloseMenu)
 			return
 		else
-			categoryCenterText("Please wait...")
+			categoryCenterText("Receiving...")
 			requireConfig()
 		end
 
@@ -253,8 +270,15 @@ function BWhiteList.OpenMenu()
 			saveBtn:SetSize(categoryCanvas:GetWide(), 30)
 			saveBtn:SetPos(0, categoryCanvas:GetTall()-30)
 			function saveBtn:DoClick()
+				categoryCanvas:Clear()
+				categoryCenterText("Executing...")
+				hook.Add("BWhiteList.Callback", "MenuUpdate", function()
+					hook.Remove("BWhiteList.Callback", "MenuUpdate")
+					if IsValid(frame) then
+						updateButton:DoClick()
+					end
+				end)
 				setConfig(cfg)
-				updateButton:DoClick()
 			end
 
 			local function detectChanges()
@@ -335,6 +359,7 @@ function BWhiteList.OpenMenu()
 		end)
 	end, function()
 		hook.Remove("BWhiteList.ConfigReceive", "MenuUpdate")
+		hook.Remove("BWhiteList.Callback", "MenuUpdate")
 	end)
 
 	addCategotyBtn("Logs", function()
@@ -343,7 +368,7 @@ function BWhiteList.OpenMenu()
 			timer.Simple(3, BWhiteList.CloseMenu)
 			return
 		else
-			categoryCenterText("Please wait...")
+			categoryCenterText("Receiving...")
 			requireLogsCount()
 		end
 
@@ -456,6 +481,7 @@ function BWhiteList.OpenMenu()
 					local line = tbl:AddLine(time, string.format(fStr, name, steamID))
 					local column2 = line.Columns[2].pnl
 					column2:SetMouseInputEnabled(true)
+					column2:SetTextColor((tonumber(log.passed) == 1) and Color(20, 255, 20) or Color(255, 20, 20))
 					column2:SetKeyboardInputEnabled(true)
 					column2:SetCursor("hand")
 					column2.DoClick = function()

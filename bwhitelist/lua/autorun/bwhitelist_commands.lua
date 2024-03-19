@@ -109,7 +109,7 @@ local function argsConcat(args)
 end
 
 // Ответное сообщение
-local function callBackMsg(ply, ...)
+function BWhiteList.callBackMsg(ply, ...)
 	local args = {...}
 	table.insert(args, 1, Color(150, 150, 200))
 	table.insert(args, 2, "[White List] ")
@@ -136,62 +136,67 @@ local methods = {
 			return {cmd.." \"SteamID\""}
 		end,
 		callback = function(ply, args)
-			if CLIENT then return end
 			local steamID = args[1] or ""
 			steamID = steamID:upper()
-			if !BWhiteList.IsSteamID(steamID) then callBackMsg(ply, Color(255, 20, 20), "Invalid SteamID!") return end
+			if !BWhiteList.IsSteamID(steamID) then BWhiteList.callBackMsg(ply, Color(255, 20, 20), "Invalid SteamID!") return end
 
-			if !BWhiteList.GetList()[steamID] then
-				BWhiteList.Add(steamID)
-				callBackMsg(ply, "Added '"..steamID.."' to white list!")
+			if SERVER then
+				if !BWhiteList.GetList()[steamID] then
+					BWhiteList.Add(steamID)
+					BWhiteList.callBackMsg(ply, "Added '"..steamID.."' to white list!")
+				else
+					BWhiteList.callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' already in white list!")
+				end
 			else
-				callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' already in white list!")
+				net.Start("BWhiteList.List")
+					net.WriteBool(true)
+					net.WriteString(steamID)
+				net.SendToServer()
 			end
 		end,
 		canUse = function(ply)
-			if IsValid(ply) and !ply:IsSuperAdmin() then callBackMsg(ply, Color(255, 20, 20), "No access!") return false end
+			if IsValid(ply) and !ply:IsSuperAdmin() then BWhiteList.callBackMsg(ply, Color(255, 20, 20), "No access!") return false end
 		end
 	},
 	remove = {
 		autoComplete = function(cmd, args)
-			if CLIENT then return end
-			local steamID = args[1] or ""
-			steamID = steamID:lower()
-
-			local tbl = {}
-			for sID, _ in pairs(BWhiteList.GetList()) do
-				if sID:lower():find(steamID) then
-					table.insert(tbl, cmd.." \""..sID.."\"")
-				end
-			end
-
-			return tbl
+			return {cmd.." \"SteamID\""}
 		end,
 		callback = function(ply, args)
-			if CLIENT then return end
 			local steamID = args[1] or ""
 			steamID = steamID:upper()
-			if !BWhiteList.IsSteamID(steamID) then callBackMsg(ply, Color(255, 20, 20), "Invalid SteamID!") return end
+			if !BWhiteList.IsSteamID(steamID) then BWhiteList.callBackMsg(ply, Color(255, 20, 20), "Invalid SteamID!") return end
 
-			if BWhiteList.GetList()[steamID] then
-				BWhiteList.Remove(steamID)
-				callBackMsg(ply, "Removed '"..steamID.."' from white list!")
+			if SERVER then
+				if BWhiteList.GetList()[steamID] then
+					BWhiteList.Remove(steamID)
+					BWhiteList.callBackMsg(ply, "Removed '"..steamID.."' from white list!")
+				else
+					BWhiteList.callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' not in white list!")
+				end
 			else
-				callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' not in white list!")
+				net.Start("BWhiteList.List")
+					net.WriteBool(false)
+					net.WriteString(steamID)
+				net.SendToServer()
 			end
 		end,
 		canUse = function(ply)
-			if IsValid(ply) and !ply:IsSuperAdmin() then callBackMsg(ply, Color(255, 20, 20), "No access!") return false end
-		end
+			if IsValid(ply) and !ply:IsSuperAdmin() then BWhiteList.callBackMsg(ply, Color(255, 20, 20), "No access!") return false end
+		end,
+
 	},
 	openmenu = {
 		callback = function(ply, args)
-			if CLIENT then return end
-			net.Start("BWhiteList.OpenMenu")
-			net.Send(ply)
+			if CLIENT then
+				BWhiteList.OpenMenu()
+			else
+				net.Start("BWhiteList.OpenMenu")
+				net.Send(ply)
+			end
 		end,
 		canUse = function(ply)
-			if IsValid(ply) and !ply:IsSuperAdmin() then callBackMsg(ply, Color(255, 20, 20), "No access!") return false end
+			if IsValid(ply) and !ply:IsSuperAdmin() then BWhiteList.callBackMsg(ply, Color(255, 20, 20), "No access!") return false end
 		end
 	}
 }
@@ -199,11 +204,10 @@ local methods = {
 concommand.Add("whitelist", function(ply, cmd, args, strargs)
 	args = SplitByArgs(strargs)
 	local method = args[1]
-	if !method then callBackMsg(ply, Color(255, 20, 20), "Method required!") return end
-
+	if !method then BWhiteList.callBackMsg(ply, Color(255, 20, 20), "Method required!") return end
 	method = methods[method]
 
-	if !method then callBackMsg(ply, Color(255, 20, 20), "Method '"..args[1].."' not allowed!") return end
+	if !method then BWhiteList.callBackMsg(ply, Color(255, 20, 20), "Method '"..args[1].."' not allowed!") return end
 	if method.canUse and method.canUse(ply) == false then return end
 
 	table.remove(args, 1)
@@ -230,7 +234,6 @@ function(cmd, strargs)
 
 	return tbl
 end)
-
 
 // Debug
 --[[

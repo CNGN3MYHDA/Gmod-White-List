@@ -1,3 +1,6 @@
+BWhiteList.CALLBACK_LIST = 0
+BWhiteList.CALLBACK_CFG = 1
+
 // Сеть
 if SERVER then
 	util.AddNetworkString("BWhiteList.Msg")
@@ -5,6 +8,14 @@ if SERVER then
 	util.AddNetworkString("BWhiteList.Config")
 	util.AddNetworkString("BWhiteList.Whitelist")
 	util.AddNetworkString("BWhiteList.Logs")
+	util.AddNetworkString("BWhiteList.List")
+	util.AddNetworkString("BWhiteList.Callback")
+
+	local function callback(ply, t)
+		net.Start("BWhiteList.Callback")
+			net.WriteUInt(t, 2)
+		net.Send(ply)
+	end
 
 	net.Receive("BWhiteList.Config", function(len, ply)
 		if !IsValid(ply) or !ply:IsSuperAdmin() then return end
@@ -20,6 +31,8 @@ if SERVER then
 			for k, v in pairs(data or {}) do
 				BWhiteList.SetConfigValue(k, v)
 			end
+
+			callback(ply, BWhiteList.CALLBACK_CFG)
 		end
 	end)
 
@@ -47,6 +60,32 @@ if SERVER then
 				net.WriteData(util.Compress(util.TableToJSON(BWhiteList.GetLogsPage(page))))
 			net.Send(ply)
 		end
+	end)
+
+	net.Receive("BWhiteList.List", function(len, ply)
+		if !IsValid(ply) or !ply:IsSuperAdmin() then return end
+
+		local isAdd = net.ReadBool()
+		local steamID = net.ReadString()
+		if !BWhiteList.IsSteamID(steamID) then return end
+
+		if isAdd then
+			if BWhiteList.GetList()[steamID] then
+				BWhiteList.callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' already in white list!")
+			else
+				BWhiteList.Add(steamID)
+				BWhiteList.callBackMsg(ply, "Added '"..steamID.."' to white list!")
+			end
+		else
+			if BWhiteList.GetList()[steamID] then
+				BWhiteList.Remove(steamID)
+				BWhiteList.callBackMsg(ply, "Removed '"..steamID.."' from white list!")
+			else
+				BWhiteList.callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' not in white list!")
+			end
+		end
+
+		callback(ply, BWhiteList.CALLBACK_LIST)
 	end)
 else
 	net.Receive("BWhiteList.Msg", function()
@@ -90,5 +129,9 @@ else
 			data = util.JSONToTable(data or "")
 			hook.Run("BWhiteList.LogsReceive", table.Copy(data or {}))
 		end
+	end)
+
+	net.Receive("BWhiteList.Callback", function()
+		hook.Run("BWhiteList.Callback", net.ReadUInt(2))
 	end)
 end
