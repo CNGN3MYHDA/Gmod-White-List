@@ -227,7 +227,7 @@ function(cmd, strargs)
 	method = args[1] or ""
 	method = method:lower()
 	for m, _ in pairs(methods) do
-		if m:lower():find(method) then
+		if m:lower():find(string.PatternSafe(method)) then
 			table.insert(tbl, cmd.." \""..m.."\"")
 		end
 	end
