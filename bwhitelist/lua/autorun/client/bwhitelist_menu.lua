@@ -227,19 +227,19 @@ function BWhiteList.OpenMenu()
 				end
 
 				local line = tbl:AddLine(lbl, sID, controls)
-				line.PlayerSteamID64 = util.SteamIDTo64(sID)
+				line.PlayerSteamID64 = util.SteamIDTo64(sID) or ""
 				line.PlayerOnline = IsValid(ply)
 
-				if !IsValid(ply) then table.insert(offlinePlayers, line.PlayerSteamID64) end
+				if !IsValid(ply) then offlinePlayers[line] = line.PlayerSteamID64 end
 			end
 
-			BWhiteList.GetPlayerNameBySteamID(offlinePlayers, function(names)
-				if !IsValid(tbl) then return end
-				for k, v in pairs(tbl:GetLines()) do
-					if v.PlayerOnline then continue end
-					v:SetColumnText(1, names[v.PlayerSteamID64])
-				end
-			end)
+			for line, sid64 in pairs(offlinePlayers) do
+				if sid64 == "" then line:SetColumnText("Unknown") continue end
+				steamworks.RequestPlayerInfo(sid64, function(name)
+					if !IsValid(tbl) then return end
+					line:SetColumnText(1, name)
+				end)
+			end
 		end)
 	end, function()
 		hook.Remove("BWhiteList.ConfigReceive", "WhitelistReceive")

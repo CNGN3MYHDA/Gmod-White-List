@@ -11,10 +11,14 @@ if SERVER then
 	util.AddNetworkString("BWhiteList.List")
 	util.AddNetworkString("BWhiteList.Callback")
 
-	local function callback(ply, t)
+	local function callback(ply, type)
 		net.Start("BWhiteList.Callback")
-			net.WriteUInt(t, 2)
+			net.WriteUInt(type, 2)
 		net.Send(ply)
+	end
+
+	BWhiteList.ListChangeCallback = function(ply)
+		callback(ply, BWhiteList.CALLBACK_LIST)
 	end
 
 	net.Receive("BWhiteList.Config", function(len, ply)
@@ -85,7 +89,7 @@ if SERVER then
 			end
 		end
 
-		callback(ply, BWhiteList.CALLBACK_LIST)
+		BWhiteList.ListChangeCallback(ply)
 	end)
 else
 	net.Receive("BWhiteList.Msg", function()

@@ -1,51 +1,14 @@
 BWhiteList = BWhiteList or {}
-local API_KEY = "A7B330BA9E2866723EF8888E6AE7092D"  -- Сделай вид, что этого тут нет
 
 // Проверить: является ли аргумент SteamID
 function BWhiteList.IsSteamID(str)
 	if !isstring(str) then return false end
 	str = str:upper()
-	if str:match("^STEAM_%d:%d:%d%d%d%d%d%d%d%d%d$") then
+	if str:match("^STEAM_%d:%d:[%d]+") then
 		return true
 	else
 		return false
 	end
-end
-
-// Получить имя игрока по SteamID
-function BWhiteList.GetPlayerNameBySteamID(steamIDs, callback)
-	assert(isstring(steamIDs) or istable(steamIDs), "steamIDs must be table")
-	assert(isfunction(callback), "callback must be a function")
-
-	local oldSteamIds = table.Copy(steamIDs)
-
-	local url = "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key="..API_KEY.."&steamids=" .. table.concat(steamIDs, ",")
-
-	http.Fetch(url, function(body, size, headers, code)
-		local data = util.JSONToTable(body)
-		
-		local names = {}
-		if data and data.response and data.response.players and #data.response.players > 0 then
-			for _, ply in pairs(data.response.players) do
-				names[ply.steamid] = ply.personaname
-			end
-		end
-
-		for k, v in pairs(oldSteamIds) do
-			if !names[v] then names[v] = "Unknown" end
-		end
-
-		callback(names)
-	end, function(err)
-		print("[White List] Error fetching player data: " .. err)
-
-		local names = {}
-		for k, v in pairs(oldSteamIds) do
-			names[v] = "Unknown"
-		end
-
-		callback(names)
-	end)
 end
 
 // Разделить строку на аргументы
@@ -147,6 +110,8 @@ local methods = {
 				else
 					BWhiteList.callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' already in white list!")
 				end
+
+				BWhiteList.ListChangeCallback(ply)
 			else
 				net.Start("BWhiteList.List")
 					net.WriteBool(true)
@@ -174,6 +139,8 @@ local methods = {
 				else
 					BWhiteList.callBackMsg(ply, Color(255, 20, 20), "SteamID '"..steamID.."' not in white list!")
 				end
+
+				BWhiteList.ListChangeCallback(ply)
 			else
 				net.Start("BWhiteList.List")
 					net.WriteBool(false)
