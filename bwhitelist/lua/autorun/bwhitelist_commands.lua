@@ -4,7 +4,7 @@ BWhiteList = BWhiteList or {}
 function BWhiteList.IsSteamID(str)
 	if !isstring(str) then return false end
 	str = str:upper()
-	if str:match("^STEAM_%d:%d:[%d]+") then
+	if str:match("^STEAM_%d:%d:[%d]+$") then
 		return true
 	else
 		return false
